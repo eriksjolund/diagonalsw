@@ -1,0 +1,22 @@
+body {
+        margin: 1em;
+        font-family: Verdana, Helvetica, Arial, sans-serif;
+}
+
+h1 {
+         background: #EEF;
+        border: #777	 solid thin;
+	padding: 0.5em;
+}
+
+.programlisting {
+    background: rgb(223,231,237);
+    font-size: small
+}
+
+div.table td { background-color: rgb(242,243,261); border-width: 1px; border-style: solid; padding: 2px; border-color: white }
+div.table th { background-color: rgb(220,225,243); border-width: 1px; border-style: solid; border-color: white }
+div.table table { border-style: none; border-width: 0px; padding: 2px;  }
+
+div.caution table, div.warning table, div.important table, div.tip table, div.note table { border: 0.2em solid rgb(180,190,195) ;
+background-color: rgb(240,245,263); padding: 0.5em; margin: 1em; }

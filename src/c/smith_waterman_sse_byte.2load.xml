@@ -1,0 +1,342 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root><file><![CDATA[
+
+#include <tmmintrin.h>
+#include <emmintrin.h>
+#include <xmmintrin.h>
+#include <smmintrin.h>  
+#include <pmmintrin.h>
+
+#include <stdio.h>
+
+#include "sw_constants.h"
+#include "smith_waterman_vector.h"
+#include "sse_funcs.h"
+
+
+
+
+
+]]><variant type="normal">
+
+size_t workspace_needed_for_byte_version(int db_length )
+{ 
+  return ((db_length + 15)*2*16);
+}
+</variant>
+
+int
+ smith_waterman_vector_byte<variant type="H">_H</variant><variant type="EFH">_EFH</variant>
+(unsigned char *     query_sequence,
+                            unsigned char *     query_profile_byte,
+                            int                 query_length,
+                            unsigned char *     db_sequence,
+                            int                 db_length,
+                            unsigned char       bias,
+                            unsigned char       gap_open,
+                            unsigned char       gap_extend,
+                            unsigned char *     workspace
+
+<variant type="H">,         unsigned short *    Hmatrix
+</variant>
+<variant type="EFH">,       unsigned short *    Ematrix,
+			    unsigned short *    Fmatrix,
+			    unsigned short *    Hmatrix
+</variant><![CDATA[
+ )
+{
+
+
+
+    int                     i,j,k,k8;
+    int                     overflow;
+    unsigned char *         p;
+    unsigned char           score;   
+
+    __m128i     Fup,Hup1,Hup2,E,F,H,tmp;
+    __m128i    v_maxscore;
+    __m128i    v_bias,v_gapopen,v_gapextend;
+    __m128i    v_score;
+
+    __m128i    v_score_load1;
+    __m128i    v_score_load2;  
+
+    const  __m128i mask1=_mm_set_epi8(0,0,0,0,255,255,255,255,0,0,0,0,255,255,255,255);
+    const  __m128i mask2=_mm_set_epi8(0,0,255,255,0,0,255,255,0,0,255,255,0,0,255,255);
+    const  __m128i mask3=_mm_set_epi8(0,255,0,255,0,255,0,255,0,255,0,255,0,255,0,255);
+
+    __m128i v0;
+    __m128i v1;
+    __m128i v2;
+    __m128i v3;
+    __m128i v4;
+    __m128i v5;
+    __m128i v6;
+    __m128i v7;
+
+
+      
+    /* Load the bias to all elements of a constant */
+    v_bias = _mm_set1_epi8(bias);
+    
+    /* Load gap opening penalty to all elements of a constant */
+
+    v_gapopen = _mm_set1_epi8(gap_open);
+
+    /* Load gap extension penalty to all elements of a constant */
+
+    v_gapextend = _mm_set1_epi8(gap_extend);
+
+    v_maxscore = _mm_setzero_si128();
+
+    // Zero out the storage vector 
+    k = 2*(db_length+15);
+
+    __m128i * iter_ptr;
+    for(i=0, iter_ptr =  ( __m128i * ) workspace  ;i<k;i++,iter_ptr++)
+    {
+        // borrow the zero value in v_maxscore to have something to store
+      _mm_store_si128( (__m128i *) iter_ptr , v_maxscore);
+    }
+    
+    for(i=0;i<query_length;i+=16)
+    {
+        int dbindex=0;
+        v0=_mm_set1_epi8(0);
+        v1=_mm_set1_epi8(0);
+        v2=_mm_set1_epi8(0);
+        v3=_mm_set1_epi8(0);
+        v4=_mm_set1_epi8(0);
+        v5=_mm_set1_epi8(0);
+        v6=_mm_set1_epi8(0);
+        v7=_mm_set1_epi8(0);
+
+
+        E          = _mm_setzero_si128();
+        F          = _mm_setzero_si128();
+        H          = _mm_setzero_si128();
+        Hup2      = _mm_setzero_si128();
+
+        // reset pointers to the start of the saved data from the last row
+        p = workspace;
+        
+        // start directly and prefetch score column
+        k             = db_sequence[0];
+        k8            = k;
+
+        v_score_load1 =  _mm_load_si128( (__m128i *) ( query_profile_byte + 16*k ) );
+
+        v_score_load2 = v_score_load1;
+
+        v_score_load1 = _mm_srli_si128(v_score_load1,8);
+
+]]>
+
+<repl/><repl/><repl/><repl/>
+<repl/><repl/><repl/><repl/>
+<repl/><repl/><repl/><repl/>
+<repl/><repl/><repl/><repl/>
+
+<![CDATA[
+        p = workspace;
+
+
+        for(j=16;j<db_length;j+=16)
+        { 
+
+
+]]>
+
+<repl/><repl/><repl/><repl/>
+<repl/><repl/><repl/><repl/>
+<repl/><repl/><repl/><repl/>
+<repl/><repl/><repl/><repl/>
+
+        }
+        
+
+<repl/><repl/><repl/><repl/>
+<repl/><repl/><repl/><repl/>
+<repl/><repl/><repl/><repl/>
+<repl/><repl/><repl/>
+
+<![CDATA[
+
+
+ending:
+
+      _mm_store_si128( (__m128i *) p , F);
+      _mm_store_si128((__m128i *)( p + 16 ), H);
+
+        query_profile_byte += 16*ALPHABET_SIZE;
+
+        // End of this row (actually 16 rows due to SIMD).
+        // Before we continue, check for overflow.
+
+        tmp      = _mm_subs_epu8(_mm_set1_epi8(255),v_bias);
+        tmp      = _mm_cmpeq_epi8 (tmp,v_maxscore);
+        int noOverflow =  _mm_testc_si128( _mm_setzero_si128(),tmp);
+        overflow = ! noOverflow ;
+    }
+
+    if(overflow)
+    {
+        return -1;
+    }
+    else
+    {
+        // find largest score in the v_maxscore vector
+
+        tmp = _mm_alignr_epi8(v_maxscore,v_maxscore,8);
+        v_maxscore = _mm_max_epu8(v_maxscore,tmp);
+        tmp = _mm_alignr_epi8(v_maxscore,v_maxscore,4);
+        v_maxscore = _mm_max_epu8(v_maxscore,tmp);
+        tmp = _mm_alignr_epi8(v_maxscore,v_maxscore,2);
+        v_maxscore = _mm_max_epu8(v_maxscore,tmp);
+        tmp = _mm_alignr_epi8(v_maxscore,v_maxscore,1);
+        v_maxscore = _mm_max_epu8(v_maxscore,tmp);
+  
+    
+        // store in temporary variable
+        score=_mm_extract_epi8(v_maxscore,0);
+      
+        // return largest score
+        return score;
+    }
+}
+
+]]></file>
+
+
+
+<repl-text>
+<range min="32" max="46">
+   if ( j >= db_length+15 ) goto ending;
+</range>
+<range min="0" max="15">k                 = db_sequence[<eval>($pos mod 16) + 1</eval>];</range>
+<range min="16" max="31">k                = db_sequence[j+<eval>($pos mod 16)+1</eval>];</range>
+
+<range min="8" max="15">k8               = db_sequence[<eval>($pos mod 16) - 7 </eval>];</range>
+<range min="16" max="31">k8               = db_sequence[j+(<eval>-7 + ($pos mod 16)</eval>)];</range>
+<range min="32" max="46">k8               = db_sequence[j-7];</range>
+
+v<eval>($pos+7) mod 8</eval> = v_score_load1;
+
+       v<eval>($pos+3) mod 8</eval>=_mm_blendv_epi8(v<eval>($pos+3) mod 8</eval>,v<eval>($pos+7) mod 8</eval>,mask1);
+       v<eval>($pos+1) mod 8</eval>=_mm_blendv_epi8(v<eval>($pos+1) mod 8</eval>,v<eval>($pos+3) mod 8</eval>,mask2);
+       v<eval>($pos+0) mod 8</eval>=_mm_blendv_epi8(v<eval>($pos+0) mod 8</eval>,v<eval>($pos+1) mod 8</eval>,mask3);
+
+v_score     = v<eval>($pos+0) mod 8</eval>;
+
+
+// prefetch score for next step 
+<range min="0" max="31">
+        v_score_load1 =  _mm_load_si128( (__m128i *) ( query_profile_byte + 16*k ) );
+</range>
+
+<range min="8" max="46">
+      v_score_load2 =  _mm_load_si128( (__m128i *) ( query_profile_byte + 16*k8 ) );
+</range>
+
+<range min="32" max="46">
+    v_score_load1 = _mm_slli_si128(v_score_load2,8);
+
+            // save old values of F and H to use on next row
+      _mm_store_si128( (__m128i *) p , F);
+      _mm_store_si128((__m128i *)( p + 16 ), H);
+</range>
+
+
+<range min="0" max="15">/* Fup    = vec_ld(0,  p); */
+        Fup =  _mm_load_si128( (__m128i *) p );
+        Hup<eval>($pos mod 2)+1</eval>   =   _mm_load_si128( (__m128i*) (p+16));
+</range>
+
+<range min="16" max="31"> /* Fup    = vec_ld(512, p); */
+        Fup =  _mm_load_si128( (__m128i *) ( p + 512 ) );
+        Hup<eval>($pos mod 2)+1</eval>   =  _mm_load_si128( (__m128i *) ( p + 528 ) );
+       // save old values of F and H to use on next row
+      _mm_store_si128( (__m128i *) p , F);
+      _mm_store_si128( (__m128i *)(p + 16) , H);
+</range>
+
+p += 32; // move ahead 32 bytes
+
+<range min="32" max="46">
+            Fup = _mm_slli_si128(F,1);
+            Hup<eval>($pos mod 2)+1</eval>   = _mm_slli_si128(H,1); 
+</range>
+
+
+<range min="0" max="31">
+// shift into place so we have complete F and H vectors
+// that refer to the values one unit up from each cell
+// that we are currently working on.
+Fup    = _mm_alignr_epi8(F,Fup,15);
+
+</range>
+
+
+<range min="0" max="31">
+   Hup<eval>($pos mod 2)+1</eval>    = _mm_alignr_epi8(H,Hup<eval>($pos mod 2)+1</eval>,15);
+</range> 
+
+
+
+// do the dynamic programming 
+
+// update E value
+
+E   = _mm_subs_epu8(E,v_gapextend);
+tmp = _mm_subs_epu8(H,v_gapopen);
+E   = _mm_max_epu8(E,tmp);
+
+
+// update F value
+F   = _mm_subs_epu8(Fup,v_gapextend);
+
+
+tmp = _mm_subs_epu8(Hup<eval>($pos mod 2)+1</eval>,v_gapopen);
+
+F   = _mm_max_epu8(F,tmp);
+
+<range min="0" max="6">
+    v_score_load1 = _mm_srli_si128(v_score_load1,8); 
+</range>
+
+<range min="7" max="31">
+        v_score_load1 = _mm_alignr_epi8( v_score_load2,v_score_load1,8);
+</range>
+
+
+// add score to H
+
+H   =  _mm_adds_epu8(Hup<eval>(($pos+1) mod 2)+1</eval>,v_score);
+//H   =  _mm_adds_epu8(Hup<eval>(($pos+1) mod 2)+1</eval>,v<eval>($pos+0) mod 8</eval>);
+
+H   = _mm_subs_epu8(H,v_bias);
+// set H to max of H,E,F
+H   = _mm_max_epu8(H,E);
+
+H   = _mm_max_epu8(H,F);
+
+
+<variant type="H">
+ set_matrix_values_from_diagonal_byte_vector(H,Hmatrix,i,query_length,dbindex,db_length);
+ dbindex++;
+</variant>
+<variant type="EFH">
+ set_matrix_values_from_diagonal_byte_vector(E,Ematrix,i,query_length,dbindex,db_length);
+ set_matrix_values_from_diagonal_byte_vector(F,Fmatrix,i,query_length,dbindex,db_length);
+ set_matrix_values_from_diagonal_byte_vector(H,Hmatrix,i,query_length,dbindex,db_length);
+ dbindex++;
+</variant>
+
+// Update highest score encountered this far
+v_maxscore = _mm_max_epu8(v_maxscore,H);
+<range min="32" max="46">
+j++;  
+</range>
+
+</repl-text>
+</root>

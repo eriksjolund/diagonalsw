@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root><file><![CDATA[
+
+#include <tmmintrin.h>
+#include <emmintrin.h>
+#include <xmmintrin.h>
+#include <smmintrin.h>  
+#include <pmmintrin.h>
+
+#include <stdio.h>
+
+
+
+#define SIMD_WIDTH 16
+
+
+
+
+static void printvec(__m128i v, char * a)
+{
+    int i;
+    union { __m128i v; unsigned char i[16]; } conv;
+    conv.v=v;
+    printf("%s=",a);
+    for(i=0;i<16;i++)
+      printf("%6X",conv.i[i]);
+    printf("\n");
+}
+
+
+static void loadvec(__m128i *  v, int num)
+{
+    int i;
+    union { __m128i v; unsigned char i[16]; } conv;
+
+/*
+    for(i=0;i<8;i++)
+      conv.i[i]=((num+8)*16+i) % 256;
+*/
+    for(i=0;i<16;i++)
+      conv.i[i]=((num)*16+i) % 256;
+
+
+    *v=conv.v;
+}
+
+
+int
+main (int          argc,
+      char **      argv)
+{
+
+const  __m128i mask1=_mm_set_epi8(0,0,0,0,0,0,0,0,255,255,255,255,255,255,255,255);
+const  __m128i mask2=_mm_set_epi8(0,0,0,0,255,255,255,255,0,0,0,0,255,255,255,255);
+const  __m128i mask3=_mm_set_epi8(0,0,255,255,0,0,255,255,0,0,255,255,0,0,255,255);
+const  __m128i mask4=_mm_set_epi8(0,255,0,255,0,255,0,255,0,255,0,255,0,255,0,255);
+
+__m128i v0=_mm_set1_epi8(0);
+__m128i v1=_mm_set1_epi8(0);
+__m128i v2=_mm_set1_epi8(0);
+__m128i v3=_mm_set1_epi8(0);
+__m128i v4=_mm_set1_epi8(0);
+__m128i v5=_mm_set1_epi8(0);
+__m128i v6=_mm_set1_epi8(0);
+__m128i v7=_mm_set1_epi8(0);
+__m128i v8=_mm_set1_epi8(0);
+__m128i v9=_mm_set1_epi8(0);
+__m128i v10=_mm_set1_epi8(0);
+__m128i v11=_mm_set1_epi8(0);
+__m128i v12=_mm_set1_epi8(0);
+__m128i v13=_mm_set1_epi8(0);
+__m128i v14=_mm_set1_epi8(0);
+__m128i v15=_mm_set1_epi8(0);
+
+
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+
+
+return 0;
+        
+}
+
+]]></file>
+<repl-text>
+
+   <range min="0" max="35">
+ <![CDATA[
+
+
+
+       loadvec(&v]]><eval>(number($pos)+15) mod 16</eval>,<eval>$pos</eval>);
+       v<eval>(number($pos)+7) mod 16</eval>=_mm_blendv_epi8(v<eval>(number($pos)+7) mod 16</eval>,v<eval>(number($pos)+15) mod 16</eval>,mask1);
+       v<eval>(number($pos)+3) mod 16</eval>=_mm_blendv_epi8(v<eval>(number($pos)+3) mod 16</eval>,v<eval>(number($pos)+7) mod 16</eval>,mask2);
+       v<eval>(number($pos)+1) mod 16</eval>=_mm_blendv_epi8(v<eval>(number($pos)+1) mod 16</eval>,v<eval>(number($pos)+3) mod 16</eval>,mask3);
+       v<eval>(number($pos)+0) mod 16</eval>=_mm_blendv_epi8(v<eval>(number($pos)+0) mod 16</eval>,v<eval>(number($pos)+1) mod 16</eval>,mask4);
+
+
+     
+       printvec(v0,"v0");
+       printvec(v1,"v1");
+       printvec(v2,"v2");
+       printvec(v3,"v3");
+       printvec(v4,"v4");
+       printvec(v5,"v5");
+       printvec(v6,"v6");
+       printvec(v7,"v7");
+       printvec(v8,"v8");
+       printvec(v9,"v9");
+       printvec(v10,"v10");
+       printvec(v11,"v11");
+       printvec(v12,"v12");
+       printvec(v13,"v13");
+       printvec(v14,"v14");
+       printvec(v15,"v15");
+
+       printvec(v<eval>(number($pos)+0) mod 16</eval>,"diagonal");
+
+
+
+
+
+  </range>
+</repl-text>
+</root>

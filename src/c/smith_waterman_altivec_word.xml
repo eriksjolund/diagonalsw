@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root><file><![CDATA[
+
+#include <stdio.h>
+
+#include "sw_constants.h"
+#include "smith_waterman_altivec_word.h"
+
+
+
+
+
+
+size_t workspace_needed_for_word_version(int db_length )
+{ 
+  return ((db_length + 7)*2*16);
+}
+
+
+
+int
+smith_waterman_altivec_word(unsigned char *     query_sequence,
+                            unsigned short *    query_profile_word,
+                            int                 query_length,
+                            unsigned char *     db_sequence,
+                            int                 db_length,
+                            unsigned short      bias,
+                            unsigned short      gap_open,
+                            unsigned short      gap_extend,
+                            unsigned short *    workspace)
+{
+    int                     i,j,k;
+    unsigned short *        p;
+    unsigned short          score;   
+    unsigned char *         p_dbseq;
+    
+    vector unsigned short   Fup,Hup1,Hup2,E,F,H,tmp;
+    vector unsigned char    perm;
+    vector unsigned short   v_maxscore;
+    vector unsigned short   v_bias,v_gapopen,v_gapextend;
+    vector unsigned short   v_score;
+    vector unsigned short   v_score_q1;
+    vector unsigned short   v_score_q2;
+    vector unsigned short   v_score_q3;
+    vector unsigned short   v_score_load; 
+    vector unsigned char    queue1_to_score  = (vector unsigned char)(16,17,2,3,4,5,6,7,8,9,10,11,12,13,14,15);
+    vector unsigned char    queue2_to_queue1 = (vector unsigned char)(0,1,18,19,4,5,6,7,8,9,10,11,12,13,14,15);
+    vector unsigned char    queue3_to_queue2 = (vector unsigned char)(16,16,16,16,16,21,16,0,16,1,16,2,16,3,16,4);
+    vector unsigned char    queue3_with_load = (vector unsigned char)(23,5,6,7,8,25,9,10,11,27,12,13,29,14,31,16);
+        
+    /* Load the bias to all elements of a constant */
+    v_bias           = vec_lde(0,&bias);
+    perm             = vec_lvsl(0,&bias);
+    v_bias           = vec_perm(v_bias,v_bias,perm);
+    v_bias           = vec_splat(v_bias,0);
+    
+    /* Load gap opening penalty to all elements of a constant */
+    v_gapopen        = vec_lde(0,&gap_open);
+    perm             = vec_lvsl(0,&gap_open);
+    v_gapopen        = vec_perm(v_gapopen,v_gapopen,perm);
+    v_gapopen        = vec_splat(v_gapopen,0);
+
+    /* Load gap extension penalty to all elements of a constant */
+    v_gapextend      = vec_lde(0,&gap_extend);  
+    perm             = vec_lvsl(0,&gap_extend);
+    v_gapextend      = vec_perm(v_gapextend,v_gapextend,perm);
+    v_gapextend      = vec_splat(v_gapextend,0);
+    
+    v_maxscore = vec_xor(v_maxscore,v_maxscore);
+   
+    // Zero out the storage vector 
+    k = 2*(db_length+7);
+        
+    for(i=0,j=0;i<k;i++,j+=16)
+    {
+        // borrow the zero value in v_maxscore to have something to store
+        vec_st(v_maxscore,j,workspace);
+    }
+    
+    for(i=0;i<query_length;i+=8)
+    {
+        // fetch first data asap.
+        p_dbseq    = db_sequence;
+        k          = *p_dbseq++;
+        v_score_load = vec_ld(16*k,query_profile_word);
+
+        // zero lots of stuff. 
+        // We use both the VPERM and VSIU unit to knock off some cycles.
+        
+        E          = vec_splat_u16(0);
+        F          = vec_xor(F,F);
+        H          = vec_splat_u16(0);
+        Hup2       = vec_xor(Hup2,Hup2);
+        v_score_q1 = vec_splat_u16(0);
+        v_score_q2 = vec_xor(v_score_q2,v_score_q2);
+        v_score_q3 = vec_splat_u16(0);
+
+        // reset pointers to the start of the saved data from the last row
+        p = workspace;
+
+
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+
+
+    
+
+        // reset pointers to the start of the saved data from the last row
+        p = workspace;
+
+        for(j=8;j<db_length;j+=8)
+        {           
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+
+        }
+        
+        v_score_load = vec_splat_u16(0);
+        
+        for(;j<db_length+7;j++)
+        {
+
+            // Create the actual diagonal score vector
+            // and update the queue of incomplete score vectors
+            //
+            // This could of course be done with only vec_perm or vec_sel,
+            // but since they use different execution units we have found
+            // it to be slightly faster to mix them.
+]]><repl/><![CDATA[
+        }
+        vec_st(F, 0,  p);
+        vec_st(H, 16, p);
+
+        query_profile_word += 8*ALPHABET_SIZE;
+    }
+
+    // find largest score in the v_maxscore vector
+    tmp = vec_sld(v_maxscore,v_maxscore,8);
+    v_maxscore = vec_max(v_maxscore,tmp);
+    tmp = vec_sld(v_maxscore,v_maxscore,4);
+    v_maxscore = vec_max(v_maxscore,tmp);
+    tmp = vec_sld(v_maxscore,v_maxscore,2);
+    v_maxscore = vec_max(v_maxscore,tmp);
+
+    // store in temporary variable
+    vec_ste(v_maxscore,0,&score);
+    
+    // return largest score
+    return score;
+}
+
+
+
+
+]]></file><repl-text><range min="0" max="7">        // PROLOGUE <eval>$pos + 1</eval></range>
+<range min="8" max="15">            // STEP <eval>($pos mod 8) +1</eval></range>
+<range min="0" max="15">
+        // prefetch next residue
+        k          = *p_dbseq++;
+        
+        // Create the actual diagonal score vector
+        // and update the queue of incomplete score vectors
+</range>
+<range min="16" max="16">
+             // Create the actual diagonal score vector
+             // and update the queue of incomplete score vectors
+             //
+             // This could of course be done with only vec_perm or vec_sel,
+             // but since they use different execution units we have found
+             // it to be slightly faster to mix them.
+</range>
+        v_score    = vec_perm(v_score_q1, v_score_load, queue1_to_score);
+        v_score_q1 = vec_perm(v_score_q2, v_score_load, queue2_to_queue1);
+        v_score_q2 = vec_perm(v_score_q3, v_score_load, queue3_to_queue2);
+        v_score_q3 = vec_perm(v_score_q3, v_score_load, queue3_with_load);
+
+<range min="0" max="15">
+        // prefetch score for next step 
+        v_score_load = vec_ld(16*k,query_profile_word);            
+        
+        // load values of F and H from previous row (one unit up)
+</range>
+<range min="0" max="7">
+        Fup    = vec_ld(0,  p);
+        Hup1   = vec_ld(16, p);
+</range>
+<range min="8" max="15">
+            Fup    = vec_ld(256, p);
+            Hup<eval>($pos mod 2)+1</eval>   = vec_ld(272, p);
+            
+</range>
+<range min="8" max="16">
+            // save old values of F and H to use on next row
+            vec_st(F, 0,  p);
+            vec_st(H, 16, p);
+</range>
+
+        p += 16; // move ahead 32 bytes
+
+<range min="0" max="15">        
+        // shift into place so we have complete F and H vectors
+        // that refer to the values one unit up from each cell
+        // that we are currently working on.
+        Fup    = vec_sld(Fup,F,14);
+        Hup<range min="0" max="7">1</range><range min="8" max="15"><eval>($pos mod 2)+1</eval></range>   = vec_sld(Hup<range min="0" max="7">1</range><range min="8" max="15"><eval>($pos mod 2)+1</eval></range>,H,14);
+</range>
+<range min="16" max="16">
+            // v_score_load contains all zeros
+            Fup    = vec_sld(v_score_load,F,14);
+            Hup1   = vec_sld(v_score_load,H,14);           
+</range>
+
+        // do the dynamic programming 
+
+        // update E value
+        E   = vec_subs(E,v_gapextend);
+        tmp = vec_subs(H,v_gapopen);
+        E   = vec_max(E,tmp);
+        
+        // update F value
+        F   = vec_subs(Fup,v_gapextend);
+        tmp = vec_subs(Hup<range min="0" max="7">1</range><range min="16" max="16">1</range><range min="8" max="15"><eval>($pos mod 2)+1</eval></range>,v_gapopen);
+        F   = vec_max(F,tmp);
+        
+        // add score to H
+        H   = vec_adds(Hup<range min="0" max="7">2</range><range min="16" max="16">2</range><range min="8" max="15"><eval>(($pos +1) mod 2)+1</eval></range>,v_score);
+        H   = vec_subs(H,v_bias);
+        
+        // set H to max of H,E,F
+        H   = vec_max(H,E);
+        H   = vec_max(H,F);
+        
+<range min="0" max="7">
+        // Save value to use for next diagonal H 
+        Hup2 = Hup1;
+</range><range min="16" max="16">
+        // Save value to use for next diagonal H 
+        Hup2 = Hup1;
+</range>
+        
+        // Update highest score encountered this far
+        v_maxscore = vec_max(v_maxscore,H);
+
+</repl-text></root>

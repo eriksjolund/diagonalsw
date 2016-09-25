@@ -1,0 +1,10 @@
+This program has these requirements at build time: 
+
+cmake
+xsltproc
+gengetopt
+
+
+Make sure these requirements are found somewhere in the standard paths ( e.g. /usr/bin, /bin ) or in a directory specified with -DCMAKE_PREFIX_PATH option to the cmake command.
+
+Documenation for diagonalsw is found at http://diagonalsw.sourceforge.net/

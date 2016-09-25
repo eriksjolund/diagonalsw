@@ -1,0 +1,328 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root><file><![CDATA[
+
+#include <stdio.h>
+
+#include "sw_constants.h"
+#include "smith_waterman_altivec_byte.h"
+
+
+#define SIMD_WIDTH 16
+
+
+static void printvec(vector unsigned char v,  char * a)
+{
+    int i;
+    union { vector unsigned char v; unsigned char i[16]; } conv;
+    
+    conv.v=v;
+    printf("%s =",a);
+    
+    for(i=0;i<SIMD_WIDTH;i++)
+        printf("%5d ",conv.i[i]);
+    printf("\n");
+}
+
+
+size_t workspace_needed_for_byte_version(int db_length )
+{ 
+  return ((db_length + 15)*2*16);
+}
+
+
+
+int
+smith_waterman_altivec_byte(unsigned char *     query_sequence,
+                            unsigned char *     query_profile_byte,
+                            int                 query_length,
+                            unsigned char *     db_sequence,
+                            int                 db_length,
+                            unsigned char       bias,
+                            unsigned char       gap_open,
+                            unsigned char       gap_extend,
+                            unsigned char *     workspace)
+{
+    int                     i,j,k,k8;
+    int                     overflow;
+    unsigned char *         p;
+    unsigned char           score;   
+    
+    vector unsigned char    Fup,Hup1,Hup2,E,F,H,tmp;
+    vector unsigned char    perm;
+    vector unsigned char    v_maxscore;
+    vector unsigned char    v_bias,v_gapopen,v_gapextend;
+    vector unsigned char    v_score;
+    vector unsigned char    v_score_q1;
+    vector unsigned char    v_score_q2;
+    vector unsigned char    v_score_q3;
+
+    vector unsigned char    v_score_q4;
+    vector unsigned char    v_score_q5;
+    vector unsigned char    v_score_load1;
+    vector unsigned char    v_score_load2;  
+    vector unsigned char    v_zero;  
+
+    vector unsigned char    queue1_to_score  = (vector unsigned char)(16,1,2,3,4,5,6,7,24,9,10,11,12,13,14,15);
+    vector unsigned char    queue2_to_queue1 = (vector unsigned char)(16,17,2,3,4,5,6,7,24,25,10,11,12,13,14,15);
+    vector unsigned char    queue3_to_queue2 = (vector unsigned char)(16,17,18,3,4,5,6,7,24,25,26,11,12,13,14,15);
+    vector unsigned char    queue4_to_queue3 = (vector unsigned char)(16,17,18,19,4,5,6,7,24,25,26,27,12,13,14,15);
+    vector unsigned char    queue5_to_queue4 = (vector unsigned char)(16,17,18,19,20,2,3,4,24,25,26,27,28,10,11,12);
+    vector unsigned char    queue5_with_load = (vector unsigned char)(19,20,21,5,6,22,7,23,27,28,29,13,14,30,15,31);
+    vector unsigned char    merge_score_load = (vector unsigned char)(0,1,2,3,4,5,6,7,24,25,26,27,28,29,30,31);
+
+    v_zero           = vec_splat_u8(0);
+        
+    /* Load the bias to all elements of a constant */
+    v_bias           = vec_lde(0,&bias);
+    perm             = vec_lvsl(0,&bias);
+    v_bias           = vec_perm(v_bias,v_bias,perm);
+    v_bias           = vec_splat(v_bias,0);
+    
+    /* Load gap opening penalty to all elements of a constant */
+    v_gapopen        = vec_lde(0,&gap_open);
+    perm             = vec_lvsl(0,&gap_open);
+    v_gapopen        = vec_perm(v_gapopen,v_gapopen,perm);
+    v_gapopen        = vec_splat(v_gapopen,0);
+
+    /* Load gap extension penalty to all elements of a constant */
+    v_gapextend      = vec_lde(0,&gap_extend);  
+    perm             = vec_lvsl(0,&gap_extend);
+    v_gapextend      = vec_perm(v_gapextend,v_gapextend,perm);
+    v_gapextend      = vec_splat(v_gapextend,0);
+    
+    v_maxscore = vec_xor(v_maxscore,v_maxscore);
+   
+    // Zero out the storage vector 
+    k = 2*(db_length+15);
+    for(i=0,j=0;i<k;i++,j+=16)
+    {
+        // borrow the zero value in v_maxscore to have something to store
+        vec_st(v_maxscore,j,workspace);
+    }
+    
+    for(i=0;i<query_length;i+=16)
+    {
+        // zero lots of stuff. 
+        // We use both the VPERM and VSIU unit to knock off some cycles.
+        
+        E          = vec_splat_u8(0);
+        F          = vec_xor(F,F);
+        H          = vec_splat_u8(0);
+        Hup2      = vec_xor(Hup2,Hup2);
+        v_score_q1 = vec_splat_u8(0);
+        v_score_q2 = vec_xor(v_score_q2,v_score_q2);
+        v_score_q3 = vec_splat_u8(0);
+        v_score_q4 = vec_xor(v_score_q4,v_score_q4);
+        v_score_q5 = vec_splat_u8(0);
+
+        // reset pointers to the start of the saved data from the last row
+        p = workspace;
+        
+        // start directly and prefetch score column
+        k             = db_sequence[0];
+        k8            = k;
+        v_score_load1 = vec_ld(16*k,query_profile_byte);
+
+        v_score_load2 = v_score_load1;
+        v_score_load1 = vec_perm(v_score_load1,v_zero,merge_score_load);
+
+
+
+
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+printf("d ---------------------------\n");
+
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+printf("e ---------------------------\n");
+             
+        p = workspace;
+        
+        for(j=16;j<db_length;j+=16)
+        { 
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+]]><repl/><![CDATA[
+printf("f ---------------------------\n");            
+        }
+        
+        
+        for(;j<db_length+15;j++)
+        {
+]]><repl/><![CDATA[
+        }
+        vec_st(F, 512, p);
+        vec_st(H, 528, p);
+
+        query_profile_byte += 16*ALPHABET_SIZE;
+
+        // End of this row (actually 16 rows due to SIMD).
+        // Before we continue, check for overflow.
+        tmp      = vec_subs(vec_splat_u8(-1),v_bias);
+        overflow = vec_any_ge(v_maxscore,tmp);
+    }
+printf("ending\n");
+    if(overflow)
+    {
+        return -1;
+    }
+    else
+    {
+        // find largest score in the v_maxscore vector
+        tmp = vec_sld(v_maxscore,v_maxscore,8);
+        v_maxscore = vec_max(v_maxscore,tmp);
+        tmp = vec_sld(v_maxscore,v_maxscore,4);
+        v_maxscore = vec_max(v_maxscore,tmp);
+        tmp = vec_sld(v_maxscore,v_maxscore,2);
+        v_maxscore = vec_max(v_maxscore,tmp);
+        tmp = vec_sld(v_maxscore,v_maxscore,1);
+        v_maxscore = vec_max(v_maxscore,tmp);
+        
+        // store in temporary variable
+        vec_ste(v_maxscore,0,&score);
+        
+        // return largest score
+        return score;
+    }
+}
+
+]]></file><repl-text>
+<range min="0" max="15">// PROLOGUE <eval>$pos + 1</eval></range>
+<range min="16" max="31">// STEP <eval>($pos mod 16) +1</eval></range>
+// prefetch next residue
+<range min="0" max="15">k = db_sequence[<eval>($pos mod 16) + 1</eval>];</range>
+<range min="8" max="15">k8               = db_sequence[<eval>($pos mod 16) - 7 </eval>];</range>
+
+<range min="16" max="31">k                = db_sequence[j+<eval>($pos mod 16)+1</eval>];</range>
+<range min="16" max="32">k8               = db_sequence[j+(<eval>-7 + ($pos mod 16)</eval>)];</range>
+
+
+v_score     = vec_perm(v_score_q1,  v_score_load1,  queue1_to_score);
+v_score_q1  = vec_perm(v_score_q2,  v_score_load1,  queue2_to_queue1);
+v_score_q2  = vec_perm(v_score_q3,  v_score_load1,  queue3_to_queue2);
+v_score_q3  = vec_perm(v_score_q4,  v_score_load1,  queue4_to_queue3);
+v_score_q4  = vec_perm(v_score_q5,  v_score_load1,  queue5_to_queue4);
+v_score_q5  = vec_perm(v_score_q5,  v_score_load1,  queue5_with_load);
+
+
+// prefetch score for next step 
+<range min="0" max="31">v_score_load1 = vec_ld(16*k,query_profile_byte);      
+      </range>
+<range min="8" max="32">v_score_load2 = vec_ld(16*k8,query_profile_byte);</range>
+
+
+<range min="32" max="32">v_score_load1 = vec_perm(v_zero,v_score_load2,merge_score_load);
+            // save old values of F and H to use on next row
+            vec_st(F, 0,  p);
+            vec_st(H, 16, p);
+</range>
+
+<range min="0" max="31">// load values of F and H from previous row (one unit up)
+</range>
+<range min="0" max="15">Fup    = vec_ld(0,  p);
+ </range>
+<range min="16" max="31">Fup    = vec_ld(512, p);</range>
+<range min="16" max="31">Hup<eval>($pos mod 2)+1</eval>   = vec_ld(528, p);</range>
+
+<range min="16" max="31">
+// save old values of F and H to use on next row
+vec_st(F, 0,  p);
+vec_st(H, 16, p);
+</range>
+
+<range min="0" max="15">Hup<eval>($pos mod 2)+1</eval>   = vec_ld(16, p);
+</range>
+p += 32; // move ahead 32 bytes
+
+<range min="32" max="32">
+            Fup    = vec_sld(v_zero,F,15);
+            Hup1   = vec_sld(v_zero,H,15);   
+</range>
+
+
+<range min="0" max="31">
+// shift into place so we have complete F and H vectors
+// that refer to the values one unit up from each cell
+// that we are currently working on.
+Fup    = vec_sld(Fup,F,15);
+
+</range>
+
+
+
+<range min="0" max="15">Hup<eval>($pos mod 2)+1</eval>    = vec_sld(Hup<eval>($pos mod 2)+1</eval>,H,15);
+
+
+</range>
+<range min="16" max="31">Hup<eval>($pos mod 2)+1</eval>    = vec_sld(Hup<eval>($pos mod 2)+1</eval>,H,15);
+</range>
+
+// do the dynamic programming 
+
+// update E value
+
+E   = vec_subs(E,v_gapextend);
+tmp = vec_subs(H,v_gapopen);
+
+E   = vec_max(E,tmp);
+
+// update F value
+F   = vec_subs(Fup,v_gapextend);
+
+
+tmp = vec_subs(Hup<eval>($pos mod 2)+1</eval>,v_gapopen);
+
+F   = vec_max(F,tmp);
+
+<range min="0" max="6">v_score_load1 = vec_perm(v_score_load1,v_zero,merge_score_load);</range>
+<range min="7" max="31">v_score_load1 = vec_perm(v_score_load1,v_score_load2,merge_score_load);</range>
+// add score to H
+H   = vec_adds(Hup<eval>(($pos + 1) mod 2)+1</eval>,v_score);
+
+
+H   = vec_subs(H,v_bias);
+
+// set H to max of H,E,F
+H   = vec_max(H,E);
+
+H   = vec_max(H,F);
+
+
+<range min="32" max="32"> 
+// Save value to use for next diagonal H 
+            Hup2 = Hup1;
+</range>
+
+
+
+// Update highest score encountered this far
+v_maxscore = vec_max(v_maxscore,H);
+
+
+</repl-text></root>
