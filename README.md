@@ -6,7 +6,7 @@ MIT-licensed C/C++ implementation of the Smith-Waterman algorithm by using SIMD 
 
 As I remember it now (2016-09-25) a few years later, for shorter reads diagonalsw did well in a benchmark comparison against
  Striped Smith-Waterman [Farrar:2006](http://bioinformatics.oxfordjournals.org/content/23/2/156.abstract). diagonalsw might be even faster when the
-sequence length was roughly the same as the SIMD vector length, but generally the Farrar implementation was faster.
+sequence length is roughly the same as the SIMD vector length, but generally the Farrar implementation is faster.
 
 Note, in 2011 a fast implementation of the Smith-Waterman algorithm was published by Torbjørn Rognes [implementation Faster Smith-Waterman database searches with inter-sequence SIMD parallelisation](http://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-12-221). The software is called [swipe](https://github.com/torognes/swipe) and seems to be the fastest when you want to run many different query sequences.
 
