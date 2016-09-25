@@ -12,7 +12,7 @@ set(CPACK_GENERATOR RPM;DEB)
 
 set(CPACK_SOURCE_GENERATOR TGZ;ZIP)
 # set(CPACK_RPM_PACKAGE_ARCHITECTURE "i386")
-set(CPACK_PACKAGE_CONTACT "erik.sjolund@sbc.su.se") 
+set(CPACK_PACKAGE_CONTACT "erik.sjolund@gmail.com")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "An efficient implementation of the Smith-Waterman algorithm that takes advantage of SIMD instruction sets in modern CPUs. The Smith-Waterman algorithm is used for sequence alignment in bioinformatics.")
 set(CPACK_PACKAGE_VENDOR "")
 SET(CPACK_SOURCE_PACKAGE_FILE_NAME "${CMAKE_PROJECT_NAME}-${PACKAGE_VERSION}")
