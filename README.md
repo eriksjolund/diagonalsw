@@ -1,6 +1,14 @@
 # diagonalsw
 
-diagonalsw is a software that implements the Smith-Waterman algorithm with the SIMD instruction sets found in modern CPUs ( SSE4.1 for the x86 platform and AltiVec for the PowerPC platform ). The software is open source software. It is written in the programming languages C and C++ and it is licensed under the MIT license.
+MIT-licensed C/C++ implementation of the Smith-Waterman algorithm by using SIMD instruction sets (SSE4.1 and Altivec). The first version of the software (for PowerPC Altivec) was written by professor [Erik Lindahl](https://www.scilifelab.se/researchers/erik-lindahl/). In 2009 Erik Sjölund translated the software to SSE and while doing that found a new way of how loading the diagonal vector. The work was done as a software development project for Erik Lindahl at Stockholm university. Version 0.9.0 of diagonalsw was released in November 26, 2009 at SourceForge. As of today (2016-09-25) this software has not yet been published in a scientific journal.
+
+## Performance
+
+As I remember it now (2016-09-25) a few years later, for shorter reads diagonalsw did well in a benchmark comparison against  
+ Striped Smith-Waterman [Farrar:2006](http://bioinformatics.oxfordjournals.org/content/23/2/156.abstract). diagonalsw might be even faster when the 
+sequence length was roughly the same as the SIMD vector length, but generally the Farrar implementation was faster. 
+
+Note, in 2011 a fast implementation of the Smith-Waterman algorithm was published by Torbjørn Rognes [implementation Faster Smith-Waterman database searches with inter-sequence SIMD parallelisation](http://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-12-221). The software is called [swipe](https://github.com/torognes/swipe) and seems to be the fastest when you want to run many different query sequences.
 
 ## Requirements
 
