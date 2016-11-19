@@ -3,10 +3,11 @@
 
 #include <tmmintrin.h>
 #include <emmintrin.h>
+#include <immintrin.h>
 #include <xmmintrin.h>
 #include <smmintrin.h>  
 #include <pmmintrin.h>
-
+#include <avx2intrin.h>
 #include <stdio.h>
 
 #include "sw_constants.h"
@@ -60,9 +61,10 @@ int
     __m128i    v_score_load1;
 //    __m128i    v_score_load2;  
 
-    const  __m128i mask1=_mm_set_epi8(0,0,0,0,0,0,0,0,255,255,255,255,255,255,255,255);
-    const  __m128i mask2=_mm_set_epi8(0,0,0,0,255,255,255,255,0,0,0,0,255,255,255,255);
-    const  __m128i mask3=_mm_set_epi8(0,0,255,255,0,0,255,255,0,0,255,255,0,0,255,255);
+    const int mask1 = ( 1 << 0) | ( 1 << 1);
+    const int mask2 = ( 1 << 0) | ( 1 << 2);
+    const int mask3 = ( 1 << 0)  | ( 1 << 2) | ( 1 << 4)  | ( 1 << 6);
+
     const  __m128i mask4=_mm_set_epi8(0,255,0,255,0,255,0,255,0,255,0,255,0,255,0,255);
 
 
@@ -253,9 +255,9 @@ ending:
 
 
 v<eval>($pos+15) mod 16</eval> = v_score_load1;
-       v<eval>($pos+7) mod 16</eval>=_mm_blendv_epi8(v<eval>($pos+7) mod 16</eval>,v<eval>($pos+15) mod 16</eval>,mask1);
-       v<eval>($pos+3) mod 16</eval>=_mm_blendv_epi8(v<eval>($pos+3) mod 16</eval>,v<eval>($pos+7) mod 16</eval>,mask2);
-       v<eval>($pos+1) mod 16</eval>=_mm_blendv_epi8(v<eval>($pos+1) mod 16</eval>,v<eval>($pos+3) mod 16</eval>,mask3);
+       v<eval>($pos+7) mod 16</eval>=_mm_blend_epi32(v<eval>($pos+7) mod 16</eval>,v<eval>($pos+15) mod 16</eval>,mask1);
+       v<eval>($pos+3) mod 16</eval>=_mm_blend_epi32(v<eval>($pos+3) mod 16</eval>,v<eval>($pos+7) mod 16</eval>,mask2);
+       v<eval>($pos+1) mod 16</eval>=_mm_blend_epi16(v<eval>($pos+1) mod 16</eval>,v<eval>($pos+3) mod 16</eval>,mask3);
        v<eval>($pos+0) mod 16</eval>=_mm_blendv_epi8(v<eval>($pos+0) mod 16</eval>,v<eval>($pos+1) mod 16</eval>,mask4);
 v_score     = v<eval>($pos+0) mod 16</eval>;
 

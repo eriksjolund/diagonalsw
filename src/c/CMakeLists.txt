@@ -56,15 +56,15 @@ endforeach(i)
 
 
 if(CMAKE_C_COMPILER MATCHES "gcc")
- set(COMPFLAGSLIST "-msse4.1  -O3 -g -p" "-msse4.1 -O3") 
- set(BESTCOMPFLAGS "-msse4.1 -O3") 
+ set(COMPFLAGSLIST "-msse4.1  -O3 -g -p" " -O3 -mavx2")
+ set(BESTCOMPFLAGS "-msse4.1 -O3 -mavx2")
 endif(CMAKE_C_COMPILER MATCHES "gcc")
 
 
 
 if(CMAKE_COMPILER_IS_GNUCXX)
- set(COMPFLAGSLIST "-msse4.1  -O3 -g -p" "-msse4.1 -O3") 
- set(BESTCOMPFLAGS "-msse4.1 -O3") 
+ set(COMPFLAGSLIST "-msse4.1  -O3 -g -p" "-msse4.1 -O3 -mavx2")
+ set(BESTCOMPFLAGS "-msse4.1 -O3 -mavx2")
 endif(CMAKE_COMPILER_IS_GNUCXX)
 
 if(CMAKE_C_COMPILER MATCHES "icc")
@@ -96,7 +96,9 @@ endif(COMPARE_DIFFERENT_APPROACHES)
 
 # The "official" diagonalsw binary:
 
-set(best_byte_target 2load_HFsave8th)
+#set(best_byte_target 2load_HFsave8th)
+set(best_byte_target 1load)
+
 set(best_word_target 2load)
 set(best_compflags "-O3 ")
 set(sw_src_list)
