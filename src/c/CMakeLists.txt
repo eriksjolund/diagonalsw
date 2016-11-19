@@ -117,5 +117,8 @@ target_link_libraries(diagonalsw tbbmalloc tbb )
 
 
 set_target_properties(diagonalsw PROPERTIES COMPILE_FLAGS "${BESTCOMPFLAGS} -DTARGET_BYTE_${best_byte_target} -DTARGET_WORD_${best_word_target}")
+set_property(TARGET diagonalsw PROPERTY CXX_STANDARD 11)
+set_property(TARGET diagonalsw PROPERTY CXX_STANDARD_REQUIRED ON)
+
 
 install(TARGETS diagonalsw DESTINATION bin)

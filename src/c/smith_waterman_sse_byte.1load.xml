@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <root><file><![CDATA[
 
+
+#include <array>
 #include <tmmintrin.h>
 #include <emmintrin.h>
 #include <immintrin.h>
@@ -61,31 +63,13 @@ int
     __m128i    v_score_load1;
 //    __m128i    v_score_load2;  
 
-    const int mask1 = ( 1 << 0) | ( 1 << 1);
-    const int mask2 = ( 1 << 0) | ( 1 << 2);
-    const int mask3 = ( 1 << 0)  | ( 1 << 2) | ( 1 << 4)  | ( 1 << 6);
+    const int mask1 = (1 << 0) | (1 << 1);
+    const int mask2 = (1 << 0) | (1 << 2);
+    const int mask3 = (1 << 0) | (1 << 2) | (1 << 4) | (1 << 6);
 
     const  __m128i mask4=_mm_set_epi8(0,255,0,255,0,255,0,255,0,255,0,255,0,255,0,255);
 
-
-    __m128i v0;
-    __m128i v1;
-    __m128i v2;
-    __m128i v3;
-    __m128i v4;
-    __m128i v5;
-    __m128i v6;
-    __m128i v7;
-    __m128i v8;
-    __m128i v9;
-    __m128i v10;
-    __m128i v11;
-    __m128i v12;
-    __m128i v13;
-    __m128i v14;
-    __m128i v15;
-
-
+    std::array<__m128i, 16> v;
       
     /* Load the bias to all elements of a constant */
     v_bias = _mm_set1_epi8(bias);
@@ -112,26 +96,12 @@ int
     
     for(i=0;i<query_length;i+=16)
     {
-        int dbindex=0;
+       int dbindex=0;
 
-        v0=_mm_set1_epi8(0);
-        v1=_mm_set1_epi8(0);
-        v2=_mm_set1_epi8(0);
-        v3=_mm_set1_epi8(0);
-        v4=_mm_set1_epi8(0);
-        v5=_mm_set1_epi8(0);
-        v6=_mm_set1_epi8(0);
-        v7=_mm_set1_epi8(0);
-        v8=_mm_set1_epi8(0);
-        v9=_mm_set1_epi8(0);
-        v10=_mm_set1_epi8(0);
-        v11=_mm_set1_epi8(0);
-        v12=_mm_set1_epi8(0);
-        v13=_mm_set1_epi8(0);
-        v14=_mm_set1_epi8(0);
-//        v15=_mm_set1_epi8(0);
-
-
+    // Why not zero out the last element? I've forgot the details.
+        for(int index=0;index<15; ++index) {
+            v[index]=_mm_set1_epi8(0);
+        }
 
         k             = db_sequence[0];
         v_score_load1 =  _mm_load_si128( (__m128i *) ( query_profile_byte + 16*k ) );
@@ -247,21 +217,17 @@ ending:
       _mm_store_si128((__m128i *)( p + 16 ), H);
 </range>
 
-
 <range min="0" max="15">
         Fup =  _mm_load_si128( (__m128i *) p );
         Hup<eval>($pos mod 2)+1</eval>   =   _mm_load_si128( (__m128i*) (p+16));
 </range>
 
-
-v<eval>($pos+15) mod 16</eval> = v_score_load1;
-       v<eval>($pos+7) mod 16</eval>=_mm_blend_epi32(v<eval>($pos+7) mod 16</eval>,v<eval>($pos+15) mod 16</eval>,mask1);
-       v<eval>($pos+3) mod 16</eval>=_mm_blend_epi32(v<eval>($pos+3) mod 16</eval>,v<eval>($pos+7) mod 16</eval>,mask2);
-       v<eval>($pos+1) mod 16</eval>=_mm_blend_epi16(v<eval>($pos+1) mod 16</eval>,v<eval>($pos+3) mod 16</eval>,mask3);
-       v<eval>($pos+0) mod 16</eval>=_mm_blendv_epi8(v<eval>($pos+0) mod 16</eval>,v<eval>($pos+1) mod 16</eval>,mask4);
-v_score     = v<eval>($pos+0) mod 16</eval>;
-
-
+v[<eval>($pos+15) mod 16</eval>] = v_score_load1;
+       v[<eval>($pos+7) mod 16</eval>]=_mm_blend_epi32(v[<eval>($pos+7) mod 16</eval>],v[<eval>($pos+15) mod 16</eval>],mask1);
+       v[<eval>($pos+3) mod 16</eval>]=_mm_blend_epi32(v[<eval>($pos+3) mod 16</eval>],v[<eval>($pos+7) mod 16</eval>],mask2);
+       v[<eval>($pos+1) mod 16</eval>]=_mm_blend_epi16(v[<eval>($pos+1) mod 16</eval>],v[<eval>($pos+3) mod 16</eval>],mask3);
+       v[<eval>($pos+0) mod 16</eval>]=_mm_blendv_epi8(v[<eval>($pos+0) mod 16</eval>],v[<eval>($pos+1) mod 16</eval>],mask4);
+v_score     = v[<eval>($pos+0) mod 16</eval>];
 
 <range min="16" max="31"> 
         Fup =  _mm_load_si128( (__m128i *) ( p + 512 ) );
@@ -315,7 +281,7 @@ F   = _mm_max_epu8(F,tmp);
 // add score to H
 
 H   =  _mm_adds_epu8(Hup<eval>(($pos+1) mod 2)+1</eval>,v_score);
-//H   =  _mm_adds_epu8(Hup<eval>(($pos+1) mod 2)+1</eval>,v<eval>($pos+0) mod 16</eval>);
+//H   =  _mm_adds_epu8(Hup<eval>(($pos+1) mod 2)+1</eval>,v[<eval>($pos+0) mod 16</eval>]);
 
 H   = _mm_subs_epu8(H,v_bias);
 // set H to max of H,E,F
