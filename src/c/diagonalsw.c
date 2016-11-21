@@ -31,6 +31,7 @@
 #include "smith_waterman_vector.h"
 #include "cmdline_diagonalsw.h"
 #include "config.h"
+#include "smith_waterman_sse_byte.1load.h"
 
 enum NeededWordVersion { yes, no};
 enum PrintOutput { onlyScore, nothing, bothScoreAndSeqID };
@@ -120,7 +121,7 @@ int smith_waterman(  unsigned char *query_seq,
 		     NeededWordVersion * needed_word_version)
 {
   *needed_word_version = no;
-  int score = smith_waterman_vector_byte
+  int score = SmithWatermanTemplate<DoNothing, DoNothing, DoNothing>(nullptr,nullptr,nullptr).smith_waterman_vector_byte
     (query_seq,
      query_profile_byte,
      query_length,
@@ -161,8 +162,8 @@ int smith_waterman(  unsigned char *query_seq,
     unsigned short * E = tmpAllocated + 3*cells;
     unsigned short * F = tmpAllocated + 4*cells;
     unsigned short * H = tmpAllocated + 5*cells;
-    int bytescore = smith_waterman_vector_byte_EFH
-      (query_seq,
+
+    int bytescore = SmithWatermanTemplate<StoreMatrixELements, StoreMatrixELements, StoreMatrixELements>(E, F, H).smith_waterman_vector_byte(query_seq,
        query_profile_byte,
        query_length,
        db_seq,
@@ -170,10 +171,7 @@ int smith_waterman(  unsigned char *query_seq,
        bias,
        gap_open,
        gap_extend,
-       (unsigned char *)workspace,
-       E,
-       F,
-       H);
+       (unsigned char *)workspace);
     int wordscore =  smith_waterman_vector_word_EFH
       (query_seq,
        query_profile_word,
