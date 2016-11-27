@@ -27,37 +27,11 @@ enum class Phase
      kEnd
 };
 
-struct DoNothing {
-  DoNothing(unsigned short *) {}
-  void operator()(const __m128i &v, int queryindex, int query_length, int dbindex, int db_length) {
-}
-
-};
-
-struct StoreMatrixELements {
-  StoreMatrixELements(unsigned short *matrix) : matrix_(matrix) {assert(matrix_);}
-  void operator()(const __m128i &v, int queryindex, int query_length, int dbindex, int db_length) {
- 
-    set_matrix_values_from_diagonal_byte_vector(v, matrix_, queryindex, query_length, dbindex, db_length);
-}
-
- private:
-  unsigned short *matrix_;
-};
-
-template<typename E_MATRIX_WATCHER, typename F_MATRIX_WATCHER, typename H_MATRIX_WATCHER>
-class SmithWatermanTemplate {
-  public:
-    SmithWatermanTemplate(E_MATRIX_WATCHER e_matrix_watcher,
-                          F_MATRIX_WATCHER f_matrix_watcher,
-                          H_MATRIX_WATCHER h_matrix_watcher) : 
-e_matrix_watcher_(e_matrix_watcher), 
-f_matrix_watcher_(f_matrix_watcher), 
-h_matrix_watcher_(h_matrix_watcher) {}
 
 
-// TODO: The inner_loop should be a template with at least "phase" and "innerloop_iter" as template parameters. 
-inline void inner_loop(const Phase &phase, const int &innerloop_iter, std::array<__m128i, 16> &v, 
+// TODO: The inner_loop should be a template with at least "phase" and "innerloop_iter" as template parameters.
+template< int innerloop_iter, typename E_MATRIX_WATCHER, typename F_MATRIX_WATCHER, typename H_MATRIX_WATCHER>
+inline void inner_loop(const Phase &phase, std::array<__m128i, 16> &v,
     int  &                   i,
     int &j,
     int &k,
@@ -78,14 +52,14 @@ inline void inner_loop(const Phase &phase, const int &innerloop_iter, std::array
     __m128i & v_score_load1,
                             int               &  db_length,
                             unsigned char *    & db_sequence,
-const int & mask1,
-const int & mask2,
-const int & mask3,
-const  __m128i & mask4,
+const __m128i & mask4,
                             unsigned char *   &  query_profile_byte,
    int            &     query_length,
-int & dbindex
-) { 
+int & dbindex,
+ E_MATRIX_WATCHER &e_matrix_watcher,
+                          F_MATRIX_WATCHER &f_matrix_watcher,
+                          H_MATRIX_WATCHER &h_matrix_watcher
+) {
 
 if (phase == Phase::kStart) {
 k                 = db_sequence[(innerloop_iter % 16) + 1];
@@ -108,14 +82,30 @@ if (phase == Phase::kStart) {
         Hup[(innerloop_iter % 2)]   =   _mm_load_si128( (__m128i*) (p+16));
 }
 
+
+
+
+
+
 v[(innerloop_iter+15) % 16] = v_score_load1;
-       v[(innerloop_iter+7) % 16]=_mm_blend_epi32(v[(innerloop_iter+7) % 16],v[(innerloop_iter+15) % 16],mask1);
-       v[(innerloop_iter+3) % 16]=_mm_blend_epi32(v[(innerloop_iter+3) % 16],v[(innerloop_iter+7) % 16],mask2);
-       v[(innerloop_iter+1) % 16]=_mm_blend_epi16(v[(innerloop_iter+1) % 16],v[(innerloop_iter+3) % 16],mask3);
-       v[(innerloop_iter+0) % 16]=_mm_blendv_epi8(v[(innerloop_iter+0) % 16],v[(innerloop_iter+1) % 16],mask4);
+
+{
+   const int mask10 = (1 << 0) | (1 << 1);
+       v[(innerloop_iter+7) % 16]=_mm_blend_epi32(v[(innerloop_iter+7) % 16],v[(innerloop_iter+15) % 16],mask10);
+}
+{
+    const int mask20 = (1 << 0) | (1 << 2);
+       v[(innerloop_iter+3) % 16]=_mm_blend_epi32(v[(innerloop_iter+3) % 16],v[(innerloop_iter+7) % 16],mask20);
+}
+
+{    const int mask30 = (1 << 0) | (1 << 2) | (1 << 4) | (1 << 6);
+       v[(innerloop_iter+1) % 16]=_mm_blend_epi16(v[(innerloop_iter+1) % 16],v[(innerloop_iter+3) % 16],mask30);
+}
+{       v[(innerloop_iter+0) % 16]=_mm_blendv_epi8(v[(innerloop_iter+0) % 16],v[(innerloop_iter+1) % 16],mask4);
+}
 v_score     = v[(innerloop_iter+0) % 16];
 
-if (phase == Phase::kMiddle) { 
+if (phase == Phase::kMiddle) {
         Fup =  _mm_load_si128( (__m128i *) ( p + 512 ) );
         Hup[(innerloop_iter % 2)] =  _mm_load_si128( (__m128i *) ( p + 528 ) );
        // save old values of F and H to use on next row
@@ -169,15 +159,44 @@ H   = _mm_max_epu8(H,E);
 
 H   = _mm_max_epu8(H,F);
 
- e_matrix_watcher_(E,i,query_length,dbindex,db_length);
- f_matrix_watcher_(F,i,query_length,dbindex,db_length);
- h_matrix_watcher_(H,i,query_length,dbindex,db_length);
+ e_matrix_watcher(E,i,query_length,dbindex,db_length);
+ f_matrix_watcher(F,i,query_length,dbindex,db_length);
+ h_matrix_watcher(H,i,query_length,dbindex,db_length);
  dbindex++;
 
 // Update highest score encountered this far
 v_maxscore = _mm_max_epu8(v_maxscore,H);
 
 }
+
+struct DoNothing {
+  DoNothing(unsigned short *) {}
+  void operator()(const __m128i &v, int queryindex, int query_length, int dbindex, int db_length) {
+}
+
+};
+
+struct StoreMatrixELements {
+  StoreMatrixELements(unsigned short *matrix) : matrix_(matrix) {assert(matrix_);}
+  void operator()(const __m128i &v, int queryindex, int query_length, int dbindex, int db_length) {
+
+    set_matrix_values_from_diagonal_byte_vector(v, matrix_, queryindex, query_length, dbindex, db_length);
+}
+
+ private:
+  unsigned short *matrix_;
+};
+
+template<typename E_MATRIX_WATCHER, typename F_MATRIX_WATCHER, typename H_MATRIX_WATCHER>
+class SmithWatermanTemplate {
+  public:
+    SmithWatermanTemplate(E_MATRIX_WATCHER e_matrix_watcher,
+                          F_MATRIX_WATCHER f_matrix_watcher,
+                          H_MATRIX_WATCHER h_matrix_watcher) :
+e_matrix_watcher_(e_matrix_watcher),
+f_matrix_watcher_(f_matrix_watcher),
+h_matrix_watcher_(h_matrix_watcher) {}
+
 
     int smith_waterman_vector_byte(unsigned char *     query_sequence,
                             unsigned char *     query_profile_byte,
@@ -201,19 +220,21 @@ v_maxscore = _mm_max_epu8(v_maxscore,H);
     __m128i    v_score;
 
     __m128i    v_score_load1;
-//    __m128i    v_score_load2;  
+//    __m128i    v_score_load2;
 
-    const int mask1 = (1 << 0) | (1 << 1);
-    const int mask2 = (1 << 0) | (1 << 2);
-    const int mask3 = (1 << 0) | (1 << 2) | (1 << 4) | (1 << 6);
 
-    const  __m128i mask4=_mm_set_epi8(0,255,0,255,0,255,0,255,0,255,0,255,0,255,0,255);
+
 
     std::array<__m128i, 16> v;
-      
+
+
+
+    const  __m128i mask4=_mm_set1_epi16(255);  // the same as:  const  __m128i mask4=_mm_set_epi8(0,255,0,255,0,255,0,255,0,255,0,255,0,255,0,255);
+
+
     /* Load the bias to all elements of a constant */
     v_bias = _mm_set1_epi8(bias);
-    
+
     /* Load gap opening penalty to all elements of a constant */
 
     v_gapopen = _mm_set1_epi8(gap_open);
@@ -233,15 +254,52 @@ v_maxscore = _mm_max_epu8(v_maxscore,H);
         // borrow the zero value in v_maxscore to have something to store
       _mm_store_si128( (__m128i *) iter_ptr , v_maxscore);
     }
-    
+
     for(i=0;i<query_length;i+=16)
     {
        int dbindex=0;
+// Is this faster? ...
+   // v[0] = _mm_setzero_si128();
 
-    // Why not zero out the last element? I've forgot the details.
-        for(int index=0;index<15; ++index) {
-            v[index]=_mm_set1_epi8(0);
-        }
+
+// I guess we could also just skip these lines. Any values would not influense the result of the computation.
+
+
+/*
+
+            v[0]=_mm_set1_epi8(0);
+            v[1]=_mm_set1_epi8(0);
+            v[2]=_mm_set1_epi8(0);
+            v[3]=_mm_set1_epi8(0);
+            v[4]=_mm_set1_epi8(0);
+            v[5]=_mm_set1_epi8(0);
+            v[6]=_mm_set1_epi8(0);
+            v[7]=_mm_set1_epi8(0);
+            v[8]=_mm_set1_epi8(0);
+            v[9]=_mm_set1_epi8(0);
+            v[10]=_mm_set1_epi8(0);
+            v[11]=_mm_set1_epi8(0);
+            v[12]=_mm_set1_epi8(0);
+            v[13]=_mm_set1_epi8(0);
+            v[14]=_mm_set1_epi8(0);
+*/
+
+            v[0]=_mm_setzero_si128();
+            v[1]=_mm_setzero_si128();
+            v[2]=_mm_setzero_si128();
+            v[3]=_mm_setzero_si128();
+            v[4]=_mm_setzero_si128();
+            v[5]=_mm_setzero_si128();
+            v[6]=_mm_setzero_si128();
+            v[7]=_mm_setzero_si128();
+            v[8]=_mm_setzero_si128();
+            v[9]=_mm_setzero_si128();
+            v[10]=_mm_setzero_si128();
+            v[11]=_mm_setzero_si128();
+            v[12]=_mm_setzero_si128();
+            v[13]=_mm_setzero_si128();
+            v[14]=_mm_setzero_si128();
+
 
         k             = db_sequence[0];
         v_score_load1 =  _mm_load_si128( (__m128i *) ( query_profile_byte + 16*k ) );
@@ -263,75 +321,236 @@ v_maxscore = _mm_max_epu8(v_maxscore,H);
 /* inner_loop< StartPhase, 2 >( v, i, j, k, overflow, p, and so on ... */
 /* and so on ... */
 
-        for (int it = 0; it < 16; ++it) {
-           inner_loop(Phase::kStart, it, v, i, j, k, overflow, p, score, Fup,
+
+
+/*
+           inner_loop<0>(Phase::kStart, it, v, i, j, k, overflow, p, score, Fup,
                       Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,
                       v_gapextend, v_score, v_score_load1,db_length,db_sequence,
                       mask1,mask2,mask3,mask4,query_profile_byte,query_length,dbindex);
-        }
+*/
+
+
+           inner_loop<0, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kStart, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+           inner_loop<1, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kStart, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+           inner_loop<2, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kStart, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+           inner_loop<3, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kStart, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+           inner_loop<4, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kStart, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+           inner_loop<5, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kStart, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+           inner_loop<6, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kStart, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+           inner_loop<7, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kStart, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+           inner_loop<8, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kStart, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+           inner_loop<9, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kStart, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+           inner_loop<10, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kStart, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+           inner_loop<11, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kStart, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+           inner_loop<12, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kStart, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+           inner_loop<13, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kStart, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+           inner_loop<14, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kStart, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+           inner_loop<15, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kStart, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+
+
         p = workspace;
 
         for(j=16;j<db_length;j+=16)
-        { 
-            for (int it = 16; it < 32; ++it) {
-                inner_loop(Phase::kMiddle, it, v, i, j, k, overflow, p, score, Fup,
-                           Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,
-                           v_gapextend, v_score, v_score_load1, db_length,db_sequence,
-                           mask1,mask2,mask3,mask4,query_profile_byte,query_length,dbindex);
-            }
+        {
+
+
+           inner_loop<16, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kMiddle, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+           inner_loop<17, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kMiddle, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+           inner_loop<18, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kMiddle, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+           inner_loop<19, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kMiddle, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+           inner_loop<20, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kMiddle, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+           inner_loop<21, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kMiddle, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+           inner_loop<22, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kMiddle, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+           inner_loop<23, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kMiddle, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+           inner_loop<24, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kMiddle, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+           inner_loop<25, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kMiddle, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+           inner_loop<26, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kMiddle, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+           inner_loop<27, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kMiddle, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+           inner_loop<28, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kMiddle, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+           inner_loop<29, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kMiddle, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+           inner_loop<30, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kMiddle, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+           inner_loop<31, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kMiddle, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+
+
         }
- 
+
 /*
   It seems it will not be possible to use this approach, because the innerloop_iter parameter can not be deduced at compile time. I am thinking about the plan to make innner_loop a template.
 
     switch ((15 -j +db_length)) {
-    case 15: inner_loop(Phase::kEnd, 16+1+                 + (15 -j +db_length)                                    ,v, i, j, k, overflow, p, score, Fup, Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen, v_gapextend, v_score, v_score_load1,db_length,db_sequence,mask1,mask2,mask3,mask4,query_profile_byte,query_length,dbindex);
+    case 15: inner_loop(Phase::kEnd, 16+1+                 + (15 -j +db_length)                                    ,v, i, j, k, overflow, p, score, Fup, Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen, v_gapextend, v_score, v_score_load1,db_length,db_sequence,mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
 
-    case 14: inner_loop(Phase::kEnd, 16+1+                 + (16 -j +db_length)                                    ,v, i, j, k, overflow, p, score, Fup, Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen, v_gapextend, v_score, v_score_load1,db_length,db_sequence,mask1,mask2,mask3,mask4,query_profile_byte,query_length,dbindex);
+    case 14: inner_loop(Phase::kEnd, 16+1+                 + (16 -j +db_length)                                    ,v, i, j, k, overflow, p, score, Fup, Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen, v_gapextend, v_score, v_score_load1,db_length,db_sequence,mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
 
-    case 13: inner_loop(Phase::kEnd, 16+1+                 + (17 -j +db_length)                                    ,v, i, j, k, overflow, p, score, Fup, Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen, v_gapextend, v_score, v_score_load1,db_length,db_sequence,mask1,mask2,mask3,mask4,query_profile_byte,query_length,dbindex);
+    case 13: inner_loop(Phase::kEnd, 16+1+                 + (17 -j +db_length)                                    ,v, i, j, k, overflow, p, score, Fup, Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen, v_gapextend, v_score, v_score_load1,db_length,db_sequence,mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
 
-    case 12: inner_loop(Phase::kEnd, 16+1+                 + (18 -j +db_length)                                    ,v, i, j, k, overflow, p, score, Fup, Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen, v_gapextend, v_score, v_score_load1,db_length,db_sequence,mask1,mask2,mask3,mask4,query_profile_byte,query_length,dbindex);
+    case 12: inner_loop(Phase::kEnd, 16+1+                 + (18 -j +db_length)                                    ,v, i, j, k, overflow, p, score, Fup, Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen, v_gapextend, v_score, v_score_load1,db_length,db_sequence,mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
 
-    case 11: inner_loop(Phase::kEnd, 16+1+                 + (19 -j +db_length)                                    ,v, i, j, k, overflow, p, score, Fup, Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen, v_gapextend, v_score, v_score_load1,db_length,db_sequence,mask1,mask2,mask3,mask4,query_profile_byte,query_length,dbindex);
+    case 11: inner_loop(Phase::kEnd, 16+1+                 + (19 -j +db_length)                                    ,v, i, j, k, overflow, p, score, Fup, Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen, v_gapextend, v_score, v_score_load1,db_length,db_sequence,mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
 
-    case 10: inner_loop(Phase::kEnd, 16+1+                 + (20 -j +db_length)                                    ,v, i, j, k, overflow, p, score, Fup, Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen, v_gapextend, v_score, v_score_load1,db_length,db_sequence,mask1,mask2,mask3,mask4,query_profile_byte,query_length,dbindex);
+    case 10: inner_loop(Phase::kEnd, 16+1+                 + (20 -j +db_length)                                    ,v, i, j, k, overflow, p, score, Fup, Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen, v_gapextend, v_score, v_score_load1,db_length,db_sequence,mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
 
-    case 9: inner_loop(Phase::kEnd, 16+1+                 + (21 -j +db_length)                                    ,v, i, j, k, overflow, p, score, Fup, Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen, v_gapextend, v_score, v_score_load1,db_length,db_sequence,mask1,mask2,mask3,mask4,query_profile_byte,query_length,dbindex);
-    case 8: inner_loop(Phase::kEnd, 16+1+                 + (22 -j +db_length)                                    ,v, i, j, k, overflow, p, score, Fup, Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen, v_gapextend, v_score, v_score_load1,db_length,db_sequence,mask1,mask2,mask3,mask4,query_profile_byte,query_length,dbindex);
-
-
-    case 7: inner_loop(Phase::kEnd, 16+1+                 + (23 -j +db_length)                                    ,v, i, j, k, overflow, p, score, Fup, Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen, v_gapextend, v_score, v_score_load1,db_length,db_sequence,mask1,mask2,mask3,mask4,query_profile_byte,query_length,dbindex);
+    case 9: inner_loop(Phase::kEnd, 16+1+                 + (21 -j +db_length)                                    ,v, i, j, k, overflow, p, score, Fup, Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen, v_gapextend, v_score, v_score_load1,db_length,db_sequence,mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+    case 8: inner_loop(Phase::kEnd, 16+1+                 + (22 -j +db_length)                                    ,v, i, j, k, overflow, p, score, Fup, Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen, v_gapextend, v_score, v_score_load1,db_length,db_sequence,mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
 
 
-    case 6: inner_loop(Phase::kEnd, 16+1+                 + (24 -j +db_length)                                    ,v, i, j, k, overflow, p, score, Fup, Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen, v_gapextend, v_score, v_score_load1,db_length,db_sequence,mask1,mask2,mask3,mask4,query_profile_byte,query_length,dbindex);
+    case 7: inner_loop(Phase::kEnd, 16+1+                 + (23 -j +db_length)                                    ,v, i, j, k, overflow, p, score, Fup, Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen, v_gapextend, v_score, v_score_load1,db_length,db_sequence,mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
 
 
-    case 5: inner_loop(Phase::kEnd, 16+1+                 + (25 -j +db_length)                                    ,v, i, j, k, overflow, p, score, Fup, Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen, v_gapextend, v_score, v_score_load1,db_length,db_sequence,mask1,mask2,mask3,mask4,query_profile_byte,query_length,dbindex);
+    case 6: inner_loop(Phase::kEnd, 16+1+                 + (24 -j +db_length)                                    ,v, i, j, k, overflow, p, score, Fup, Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen, v_gapextend, v_score, v_score_load1,db_length,db_sequence,mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
 
 
-    case 4: inner_loop(Phase::kEnd, 16+1+                 + (26 -j +db_length)                                    ,v, i, j, k, overflow, p, score, Fup, Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen, v_gapextend, v_score, v_score_load1,db_length,db_sequence,mask1,mask2,mask3,mask4,query_profile_byte,query_length,dbindex);
+    case 5: inner_loop(Phase::kEnd, 16+1+                 + (25 -j +db_length)                                    ,v, i, j, k, overflow, p, score, Fup, Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen, v_gapextend, v_score, v_score_load1,db_length,db_sequence,mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
 
 
-    case 3: inner_loop(Phase::kEnd, 16+1+                 + (27 -j +db_length)                                    ,v, i, j, k, overflow, p, score, Fup, Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen, v_gapextend, v_score, v_score_load1,db_length,db_sequence,mask1,mask2,mask3,mask4,query_profile_byte,query_length,dbindex);
+    case 4: inner_loop(Phase::kEnd, 16+1+                 + (26 -j +db_length)                                    ,v, i, j, k, overflow, p, score, Fup, Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen, v_gapextend, v_score, v_score_load1,db_length,db_sequence,mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
 
 
-    case 2: inner_loop(Phase::kEnd, 16+1+                 + (28 -j +db_length)                                    ,v, i, j, k, overflow, p, score, Fup, Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen, v_gapextend, v_score, v_score_load1,db_length,db_sequence,mask1,mask2,mask3,mask4,query_profile_byte,query_length,dbindex);
+    case 3: inner_loop(Phase::kEnd, 16+1+                 + (27 -j +db_length)                                    ,v, i, j, k, overflow, p, score, Fup, Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen, v_gapextend, v_score, v_score_load1,db_length,db_sequence,mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
 
-    case 1: inner_loop(Phase::kEnd, 16+1+                 + (29 -j +db_length)                                    ,v, i, j, k, overflow, p, score, Fup, Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen, v_gapextend, v_score, v_score_load1,db_length,db_sequence,mask1,mask2,mask3,mask4,query_profile_byte,query_length,dbindex);
+
+    case 2: inner_loop(Phase::kEnd, 16+1+                 + (28 -j +db_length)                                    ,v, i, j, k, overflow, p, score, Fup, Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen, v_gapextend, v_score, v_score_load1,db_length,db_sequence,mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+
+    case 1: inner_loop(Phase::kEnd, 16+1+                 + (29 -j +db_length)                                    ,v, i, j, k, overflow, p, score, Fup, Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen, v_gapextend, v_score, v_score_load1,db_length,db_sequence,mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
 
 */
 
+/*
     for (int it = 32; it < 47; ++it) {
-        if ( j >= db_length+15 ) { 
+        if ( j >= db_length+15 ) {
             goto ending;
         }
-        inner_loop(Phase::kEnd, it, v, i, j, k, overflow, p, score, Fup,
+        inner_loop(Phase::kEnd, v, i, j, k, overflow, p, score, Fup,
                    Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,
                    v_gapextend, v_score, v_score_load1, db_length, db_sequence,
-                   mask1, mask2, mask3, mask4, query_profile_byte, query_length, dbindex);
-        j++;  
+                   mask1, mask2, mask3, mask4, query_profile_byte, query_length, dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+        j++;
     }
+*/
+
+
+// We could get rid of all these if-statements if we add a template parameter for (db_length % 16)
+// template<typename E_MATRIX_WATCHER, typename F_MATRIX_WATCHER, typename H_MATRIX_WATCHER, int modulo16_db_length >
+// class SmithWatermanTemplate {
+//
+
+
+
+        if ( j >= db_length+15 ) {
+            goto ending;
+        }
+           inner_loop<32, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kEnd, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+         ++j;
+
+
+        if ( j >= db_length+15 ) {
+            goto ending;
+        }
+           inner_loop<33, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kEnd, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+         ++j;
+
+        if ( j >= db_length+15 ) {
+            goto ending;
+        }
+           inner_loop<34, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kEnd, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+         ++j;
+
+
+
+
+        if ( j >= db_length+15 ) {
+            goto ending;
+        }
+           inner_loop<35, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kEnd, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+         ++j;
+
+
+
+        if ( j >= db_length+15 ) {
+            goto ending;
+        }
+           inner_loop<36, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kEnd, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+         ++j;
+
+
+
+        if ( j >= db_length+15 ) {
+            goto ending;
+        }
+           inner_loop<37, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kEnd, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+         ++j;
+
+
+
+        if ( j >= db_length+15 ) {
+            goto ending;
+        }
+           inner_loop<38, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kEnd, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+         ++j;
+
+
+        if ( j >= db_length+15 ) {
+            goto ending;
+        }
+           inner_loop<39, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kEnd, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+         ++j;
+
+
+
+        if ( j >= db_length+15 ) {
+            goto ending;
+        }
+           inner_loop<40, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kEnd, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+         ++j;
+
+
+
+        if ( j >= db_length+15 ) {
+            goto ending;
+        }
+           inner_loop<41, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kEnd, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+         ++j;
+
+
+
+        if ( j >= db_length+15 ) {
+            goto ending;
+        }
+           inner_loop<42, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kEnd, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+         ++j;
+
+
+        if ( j >= db_length+15 ) {
+            goto ending;
+        }
+           inner_loop<43, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kEnd, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+         ++j;
+
+
+        if ( j >= db_length+15 ) {
+            goto ending;
+        }
+           inner_loop<44, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kEnd, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+         ++j;
+
+
+        if ( j >= db_length+15 ) {
+            goto ending;
+        }
+           inner_loop<45, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kEnd, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex, e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+         ++j;
+
+        if ( j >= db_length+15 ) {
+            goto ending;
+        }
+           inner_loop<46, E_MATRIX_WATCHER, F_MATRIX_WATCHER, H_MATRIX_WATCHER>(Phase::kEnd, v, i, j, k, overflow, p, score, Fup,                      Hup, E, F, H, tmp, v_maxscore, v_bias, v_gapopen,  v_gapextend, v_score, v_score_load1,db_length,db_sequence,                      mask4,query_profile_byte,query_length,dbindex,            e_matrix_watcher_, f_matrix_watcher_, h_matrix_watcher_);
+         ++j;
+
+
+
+
+
 
 ending:
 
