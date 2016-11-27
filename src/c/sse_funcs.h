@@ -15,8 +15,8 @@ extern "C" {
 
 void printvec(__m128i v, char * a);
 
-void set_matrix_values_from_diagonal_byte_vector(__m128i v, unsigned short * matrix, int queryindex,int query_length,int dbindex,int db_length);
-void set_matrix_values_from_diagonal_word_vector(__m128i v, unsigned short * matrix,int queryindex,int query_length,int dbindex,int db_length);
+void set_matrix_values_from_diagonal_byte_vector(const __m128i &v, unsigned short * matrix, int queryindex,int query_length,int dbindex,int db_length);
+void set_matrix_values_from_diagonal_word_vector(const __m128i &v, unsigned short * matrix,int queryindex,int query_length,int dbindex,int db_length);
 
 #ifdef CHECK_MATRICES_BYTE
 void printvec_byte_index(__m128i v, char * matrix,int queryindex,int query_length,int dbindex,int db_length);

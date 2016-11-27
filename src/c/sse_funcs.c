@@ -17,7 +17,7 @@ void printvec(__m128i v, char * a)
 
 
 
-void  set_matrix_values_from_diagonal_byte_vector(__m128i v, unsigned short * matrix, int queryindex,int query_length,int dbindex,int db_length)
+void  set_matrix_values_from_diagonal_byte_vector(const __m128i &v, unsigned short * matrix, int queryindex,int query_length,int dbindex,int db_length)
 {
   int i;
   union { __m128i v; unsigned char i[16]; } conv;
@@ -33,7 +33,7 @@ void  set_matrix_values_from_diagonal_byte_vector(__m128i v, unsigned short * ma
     }
 }
 
-void set_matrix_values_from_diagonal_word_vector(__m128i v, unsigned short * matrix,int queryindex,int query_length,int dbindex,int db_length)
+void set_matrix_values_from_diagonal_word_vector(const __m128i &v, unsigned short * matrix,int queryindex,int query_length,int dbindex,int db_length)
 {
   int i;
   union { __m128i v; unsigned short i[8]; } conv;

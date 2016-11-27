@@ -29,14 +29,14 @@ enum class Phase
 
 struct DoNothing {
   DoNothing(unsigned short *) {}
-  void operator()(__m128i v, int queryindex, int query_length, int dbindex, int db_length) {
+  void operator()(const __m128i &v, int queryindex, int query_length, int dbindex, int db_length) {
 }
 
 };
 
 struct StoreMatrixELements {
   StoreMatrixELements(unsigned short *matrix) : matrix_(matrix) {assert(matrix_);}
-  void operator()(__m128i v, int queryindex, int query_length, int dbindex, int db_length) {
+  void operator()(const __m128i &v, int queryindex, int query_length, int dbindex, int db_length) {
  
     set_matrix_values_from_diagonal_byte_vector(v, matrix_, queryindex, query_length, dbindex, db_length);
 }
